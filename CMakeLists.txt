@@ -7,6 +7,7 @@ project(
     LANGUAGES CXX
 )
 
+add_subdirectory("src/network")
 add_subdirectory("src/core")
 
 # When using Visual Studio, set the core executable as the startup project
