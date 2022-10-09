@@ -7,6 +7,7 @@ set(
 
 set(
     HEADER_FILES
+    include/http/request_method.hpp
     include/tcp/socket_factory.hpp
     include/tcp/socket_state_change.hpp
     include/tcp/socket.hpp
