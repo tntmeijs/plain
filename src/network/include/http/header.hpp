@@ -1,6 +1,8 @@
 #ifndef NETWORK_HTTP_HEADER_HPP
 #define NETWORK_HTTP_HEADER_HPP
 
+#include "spdlog/spdlog.h"
+
 #include <iostream>
 
 namespace network::http {
@@ -36,8 +38,8 @@ namespace network::http {
 
 				default:
 				{
-					std::cerr << "Unknown header" << std::endl;
-					exit(1);
+					spdlog::error("Unknown header specified");
+					return "Invalid-Header";
 				}
 			}
 		}

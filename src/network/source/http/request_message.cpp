@@ -1,5 +1,7 @@
 #include "http/request_message.hpp"
 
+#include "spdlog/spdlog.h"
+
 using namespace network::http;
 
 // Reference: https://www.rfc-editor.org/rfc/rfc2616#section-2.2
@@ -19,6 +21,8 @@ std::string RequestMessage::generate() const {
 
 	// Optional body
 	data += body;
+
+	spdlog::trace(data);
 
 	return data;
 }

@@ -1,7 +1,7 @@
 #ifndef NETWORK_HTTP_METHOD_HPP
 #define NETWORK_HTTP_METHOD_HPP
 
-#include <iostream>
+#include "spdlog/spdlog.h"
 
 namespace network::http {
 
@@ -71,8 +71,8 @@ namespace network::http {
 
 				default:
 				{
-					std::cerr << "Unknown HTTP method" << std::endl;
-					exit(1);
+					spdlog::error("Unknown HTTP method specified");
+					return "INVALID";
 				}
 			}
 		}

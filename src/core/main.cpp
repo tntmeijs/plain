@@ -2,7 +2,7 @@
 #include "tcp/socket_factory.hpp"
 #include "http/request_message_builder.hpp"
 
-#include <iostream>
+#include "spdlog/spdlog.h"
 
 using namespace network::tcp;
 using namespace network::http;
@@ -13,6 +13,8 @@ int main(int argc, char* argv[]) {
 	// Unreferenced formal parameter warnings
 	argc;
 	argv;
+
+	spdlog::set_level(spdlog::level::level_enum::trace);
 
 	const auto socket = SocketFactory().create();
 
@@ -34,15 +36,10 @@ int main(int argc, char* argv[]) {
 		.withHttpMethod(HttpMethod::Get)
 		.build();
 
-	const auto message = request.generate();
-
-	std::cout << message << std::endl;
-
-	socket->send(message);
+	socket->send(request.generate());
 
 	// Wait until the server disconnects the client
 	socket->receive();
-
 	socket->close();
 
 	return 0;
