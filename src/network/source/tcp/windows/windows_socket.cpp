@@ -128,6 +128,15 @@ bool WindowsTcpSocket::receive() {
 
 			if (result > 0) {
 				std::cout << "Bytes received: " << result << std::endl;
+
+				// DEBUG: log the response to the console
+				std::string output;
+
+				for (int i = 0; i < result; ++i) {
+					output += receiveBuffer[i];
+				}
+
+				std::cout << output << std::endl;
 			} else if (result == 0) {
 				std::cout << "Connection closed by server" << std::endl;
 			} else {

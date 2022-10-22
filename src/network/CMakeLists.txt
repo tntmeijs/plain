@@ -1,5 +1,7 @@
 set(
     SOURCE_FILES
+    source/http/request_message_builder.cpp
+    source/http/request_message.cpp
     source/tcp/socket_factory.cpp
     source/tcp/socket.cpp
     source/tcp/windows/windows_socket.cpp
@@ -7,7 +9,10 @@ set(
 
 set(
     HEADER_FILES
-    include/http/request_method.hpp
+    include/http/http_method.hpp
+    include/http/header.hpp
+    include/http/request_message_builder.hpp
+    include/http/request_message.hpp
     include/tcp/socket_factory.hpp
     include/tcp/socket_state_change.hpp
     include/tcp/socket.hpp
