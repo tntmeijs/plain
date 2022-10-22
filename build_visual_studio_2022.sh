@@ -1,3 +1,5 @@
+git submodule update --recursive
+
 mkdir -p build
 
 pushd build
