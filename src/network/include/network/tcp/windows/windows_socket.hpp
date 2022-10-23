@@ -3,7 +3,7 @@
 #ifndef NETWORK_TCP_WINDOWS_SOCKET_HPP
 #define NETWORK_TCP_WINDOWS_SOCKET_HPP
 
-#include "tcp/socket.hpp"
+#include "network/tcp/socket.hpp"
 
 #include <WinSock2.h>
 

@@ -9,14 +9,20 @@ Plain will realistically never even come close to the commercial webbrowsers.
 
 However, you will be able to navigate the web using Plain!
 
-# Third-party libraries
+# Third-party libraries and SDKs
 Writing a webbrowser from scratch is a lot of work.
-To avoid spending a lot of time writing literally *everything* from scratch, Plain uses a few open-source, third-party, dependencies.
+To avoid spending a lot of time writing literally *everything* from scratch, Plain depends on a few third-party libraries and SDKs:
+- [Vulkan](https://www.vulkan.org/): Next-generation API for 3D graphics and computing (could be seen as a "successor" to [OpenGL](https://www.opengl.org/)).
 - [Spdlog](https://github.com/gabime/spdlog) ([MIT](https://github.com/gabime/spdlog/blob/v1.x/LICENSE)): Very fast, header-only/compiled, C++ logging library.
+- [GLM](https://github.com/g-truc/glm) ([MIT](https://github.com/g-truc/glm/blob/master/copying.txt)): Header only C++ mathematics library.
+- [GLFW](https://github.com/glfw/glfw) ([Zlib](https://github.com/glfw/glfw/blob/master/LICENSE.md)): A multi-platform library for OpenGL, OpenGL ES, Vulkan, window and input.
 
 This project would not have been possible without the help of these awesome libraries. ♥
 
 # Development log
+## 23<sup>rd</sup> of October 2022
+- Start working on Vulkan rendering backend.
+
 ## 22<sup>nd</sup> of October 2022
 - Implemented very basic HTTP/1.1 protocol.
 - Added logging to make it easier to debug the application.

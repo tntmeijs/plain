@@ -1,5 +1,5 @@
-#include "tcp/socket_factory.hpp"
-#include "tcp/windows/windows_socket.hpp"
+#include "network/tcp/socket_factory.hpp"
+#include "network/tcp/windows/windows_socket.hpp"
 
 #include "spdlog/spdlog.h"
 

@@ -9,14 +9,14 @@ set(
 
 set(
     HEADER_FILES
-    include/http/http_method.hpp
-    include/http/header.hpp
-    include/http/request_message_builder.hpp
-    include/http/request_message.hpp
-    include/tcp/socket_factory.hpp
-    include/tcp/socket_state_change.hpp
-    include/tcp/socket.hpp
-    include/tcp/windows/windows_socket.hpp
+    include/network/http/http_method.hpp
+    include/network/http/header.hpp
+    include/network/http/request_message_builder.hpp
+    include/network/http/request_message.hpp
+    include/network/tcp/socket_factory.hpp
+    include/network/tcp/socket_state_change.hpp
+    include/network/tcp/socket.hpp
+    include/network/tcp/windows/windows_socket.hpp
 )
 
 set(ALL_FILES ${SOURCE_FILES} ${HEADER_FILES})
