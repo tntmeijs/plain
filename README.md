@@ -21,7 +21,9 @@ This project would not have been possible without the help of these awesome libr
 
 # Development log
 ## 23<sup>rd</sup> of October 2022
-- Start working on Vulkan rendering backend.
+- Created graphics project.
+- Added window creation.
+  ![window creation](media/20221023_window_creation.png)
 
 ## 22<sup>nd</sup> of October 2022
 - Implemented very basic HTTP/1.1 protocol.

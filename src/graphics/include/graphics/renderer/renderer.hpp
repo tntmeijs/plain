@@ -11,6 +11,15 @@ namespace graphics::renderer {
 		Renderer& operator=(const Renderer&) = delete;
 		Renderer& operator=(Renderer&&) = delete;
 		~Renderer();
+
+		// Initialize the renderer's systems
+		bool initialize();
+
+		// Prepare for drawing
+		bool update();
+
+		// Draw the scene
+		void render() const;
 	};
 
 }

@@ -1,13 +1,10 @@
-#include "network/tcp/socket.hpp"
-#include "network/tcp/socket_factory.hpp"
-#include "network/http/request_message_builder.hpp"
 #include "graphics/window/window.hpp"
+#include "graphics/renderer/renderer.hpp"
 
 #include "spdlog/spdlog.h"
 
-using namespace network::tcp;
-using namespace network::http;
 using namespace graphics::window;
+using namespace graphics::renderer;
 
 constexpr const char* const USER_AGENT_NAME = "Plain/0.1";
 
@@ -18,34 +15,22 @@ int main(int argc, char* argv[]) {
 
 	spdlog::set_level(spdlog::level::level_enum::trace);
 
-	auto window = Window();
-	window.create();
+	auto window = Window(800, 600, "Plain - a webbrowser by Tahar Meijs");
+	if (!window.create()) {
+		spdlog::critical("Application failed to start because the window could not be created");
+		return EXIT_FAILURE;
+	}
 
-	//const auto socket = SocketFactory().create();
+	auto renderer = Renderer();
+	renderer.initialize();
 
-	//if (!socket) {
-	//	// Failed to create a socket
-	//	return 1;
-	//}
+	do {
+		window.poll();
+		renderer.update();
+		renderer.render();
+	} while (window.isAlive());
+	
+	window.destroy();
 
-	//if (!socket->open("eu.httpbin.org", 80)) {
-	//	socket->close();
-	//	return 1;
-	//}
-
-	//// Construct a simple HTTP message
-	//const auto& request = RequestMessageBuilder()
-	//	.withTarget("/")
-	//	.withHost("www.eu.httpbin.org:80")
-	//	.withHeader(Header::UserAgent, USER_AGENT_NAME)
-	//	.withHttpMethod(HttpMethod::Get)
-	//	.build();
-
-	//socket->send(request.generate());
-
-	//// Wait until the server disconnects the client
-	//socket->receive();
-	//socket->close();
-
-	return 0;
+	return EXIT_SUCCESS;
 }
