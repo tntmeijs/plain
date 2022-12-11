@@ -17,7 +17,9 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${ALL_FILES})
 add_library(graphics ${ALL_FILES})
 
 target_compile_features(graphics PRIVATE cxx_std_20)
-target_include_directories(graphics PUBLIC include)
+target_include_directories(graphics PUBLIC include ${Vulkan_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR}/dependencies/spdlog/include)
+target_link_libraries(graphics PRIVATE glfw glm::glm ${Vulkan_LIBRARIES})
+
 set_target_properties(graphics PROPERTIES CXX_EXTENSIONS OFF)
 
 if(MSVC)

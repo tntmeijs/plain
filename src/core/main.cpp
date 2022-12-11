@@ -1,5 +1,5 @@
-#include "graphics/window/window.hpp"
 #include "graphics/renderer/renderer.hpp"
+#include "graphics/window/window.hpp"
 
 #include "spdlog/spdlog.h"
 
@@ -30,6 +30,7 @@ int main(int argc, char* argv[]) {
 		renderer.render();
 	} while (window.isAlive());
 	
+	renderer.destroy();
 	window.destroy();
 
 	return EXIT_SUCCESS;

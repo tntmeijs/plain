@@ -1,17 +1,12 @@
 #ifndef GRAPHICS_RENDERER_RENDERER_HPP
 #define GRAPHICS_RENDERER_RENDERER_HPP
 
+#include "vulkan/vulkan.h"
+
 namespace graphics::renderer {
 
 	class Renderer final {
 	public:
-		Renderer();
-		Renderer(const Renderer&) = delete;
-		Renderer(Renderer&&) = delete;
-		Renderer& operator=(const Renderer&) = delete;
-		Renderer& operator=(Renderer&&) = delete;
-		~Renderer();
-
 		// Initialize the renderer's systems
 		bool initialize();
 
@@ -20,6 +15,12 @@ namespace graphics::renderer {
 
 		// Draw the scene
 		void render() const;
+
+		// Deallocate resources
+		void destroy();
+
+	private:
+		VkInstance instance;
 	};
 
 }

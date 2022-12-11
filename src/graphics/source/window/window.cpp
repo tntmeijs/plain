@@ -27,9 +27,9 @@ bool Window::create() {
 	glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 	handle = glfwCreateWindow(width, height, title.c_str(), nullptr, nullptr);
 
-	spdlog::info("Window created successfully");
-	spdlog::info("    width: {}", width);
-	spdlog::info("    height:{}", height);
+	spdlog::trace("Window created successfully");
+	spdlog::trace("    width:  {}", width);
+	spdlog::trace("    height: {}", height);
 	return handle != nullptr;
 }
 

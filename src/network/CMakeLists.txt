@@ -26,7 +26,8 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${ALL_FILES})
 add_library(network ${ALL_FILES})
 
 target_compile_features(network PRIVATE cxx_std_20)
-target_include_directories(network PUBLIC include)
+target_include_directories(network PUBLIC include ${CMAKE_SOURCE_DIR}/dependencies/spdlog/include)
+
 set_target_properties(network PROPERTIES CXX_EXTENSIONS OFF)
 
 if(MSVC)

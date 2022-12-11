@@ -43,15 +43,6 @@ add_dependencies(network spdlog)
 add_dependencies(graphics spdlog glm glfw)
 add_dependencies(plain network graphics spdlog)
 
-# Ensure all projects can find the spdlog header files
-target_include_directories(plain PRIVATE dependencies/spdlog/include)
-target_include_directories(network PRIVATE dependencies/spdlog/include)
-target_include_directories(graphics PRIVATE dependencies/spdlog/include ${Vulkan_INCLUDE_DIRS})
-
-target_link_libraries(plain PRIVATE network graphics)
-target_link_libraries(plain PRIVATE graphics)
-target_link_libraries(graphics PRIVATE glfw glm::glm ${Vulkan_LIBRARIES})
-
 # When using Visual Studio, set the core executable as the startup project
 if (${MSVC})
     set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT plain)
