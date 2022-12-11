@@ -21,6 +21,10 @@ namespace graphics::renderer {
 
 	private:
 		VkInstance instance;
+
+#ifndef NDEBUG
+		VkDebugUtilsMessengerEXT debugMessenger;
+#endif
 	};
 
 }

@@ -20,6 +20,10 @@ To avoid spending a lot of time writing literally *everything* from scratch, Pla
 This project would not have been possible without the help of these awesome libraries. ♥
 
 # Development log
+## 11<sup>th</sup> of December 2022
+- Added Vulkan instance creation.
+- Added Vulkan extension and validation layer configuration.
+
 ## 23<sup>rd</sup> of October 2022
 - Created graphics project.
 - Added window creation.

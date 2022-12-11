@@ -13,13 +13,13 @@ Window::Window(const std::uint32_t width, const std::uint32_t height, const std:
 	if (glfwInit() != GLFW_TRUE) {
 		spdlog::critical("Unable to initialize GLFW: {}", glfwGetError(nullptr));
 	} else {
-		spdlog::trace("GLFW initialized");
+		spdlog::debug("GLFW initialized");
 	}
 }
 
 Window::~Window() {
 	glfwTerminate();
-	spdlog::trace("GLFW terminated");
+	spdlog::debug("GLFW terminated");
 }
 
 bool Window::create() {
@@ -27,9 +27,9 @@ bool Window::create() {
 	glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 	handle = glfwCreateWindow(width, height, title.c_str(), nullptr, nullptr);
 
-	spdlog::trace("Window created successfully");
-	spdlog::trace("    width:  {}", width);
-	spdlog::trace("    height: {}", height);
+	spdlog::debug("Window created successfully");
+	spdlog::debug("    width:  {}", width);
+	spdlog::debug("    height: {}", height);
 	return handle != nullptr;
 }
 
@@ -43,7 +43,7 @@ void Window::poll() const {
 
 void Window::destroy() {
 	if (handle != nullptr) {
-		spdlog::trace("Destroyed GLFW window");
+		spdlog::debug("Destroyed GLFW window");
 		glfwDestroyWindow(handle);
 		handle = nullptr;
 	}
