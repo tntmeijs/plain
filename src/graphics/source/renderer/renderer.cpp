@@ -162,19 +162,17 @@ bool Renderer::initialize() {
 	}
 #endif
 
-	// Physical device selection
+	// Physical and logical device selection
 	{
-		physicalDevice = VK_NULL_HANDLE;
+		std::uint32_t gpuCount = 0;
+		vkEnumeratePhysicalDevices(instance, &gpuCount, nullptr);
 
-		std::uint32_t deviceCount = 0;
-		vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr);
-
-		if (deviceCount == 0) {
+		if (gpuCount == 0) {
 			spdlog::error("No GPU with Vulkan support was found on this system");
 		}
 
-		std::vector<VkPhysicalDevice> physicalDevices(deviceCount);
-		vkEnumeratePhysicalDevices(instance, &deviceCount, physicalDevices.data());
+		std::vector<VkPhysicalDevice> gpus(gpuCount);
+		vkEnumeratePhysicalDevices(instance, &gpuCount, gpus.data());
 
 		struct QueueFamilyIndices {
 			std::optional<std::uint32_t> graphics;
@@ -214,8 +212,8 @@ bool Renderer::initialize() {
 			return indices;
 		};
 
-		const auto isDeviceSuitable = [&findQueueFamilyIndices](const VkPhysicalDevice& device) -> bool {
-			const auto queueFamilyIndices = findQueueFamilyIndices(device);
+		const auto isDeviceSuitable = [&findQueueFamilyIndices](const VkPhysicalDevice& gpu) -> bool {
+			const auto queueFamilyIndices = findQueueFamilyIndices(gpu);
 
 			if (!queueFamilyIndices.isComplete()) {
 				spdlog::trace("Unable to find all required queue family indices");
@@ -240,7 +238,7 @@ bool Renderer::initialize() {
 			return total / 1'000'000'000;
 		};
 
-		const auto rateDevice = [&getTotalVideoRamOfDeviceInGigaBytes](
+		const auto rateGpu = [&getTotalVideoRamOfDeviceInGigaBytes](
 			const VkPhysicalDeviceProperties& deviceProperties,
 			const VkPhysicalDeviceFeatures& deviceFeatures,
 			const VkPhysicalDeviceMemoryProperties& deviceMemoryProperties) -> std::uint64_t {
@@ -267,34 +265,69 @@ bool Renderer::initialize() {
 
 		std::multimap<std::uint64_t, VkPhysicalDevice> ratingToGpuMapping;
 
-		spdlog::debug("Found {} GPU{}:", deviceCount, deviceCount != 1 ? "s" : "");
-		for (const auto& device : physicalDevices) {
+		spdlog::debug("Found {} GPU{}:", gpuCount, gpuCount != 1 ? "s" : "");
+		for (const auto& gpu : gpus) {
 			VkPhysicalDeviceProperties deviceProperties;
 			VkPhysicalDeviceFeatures deviceFeatures;
 			VkPhysicalDeviceMemoryProperties deviceMemoryProperties;
 
-			vkGetPhysicalDeviceProperties(device, &deviceProperties);
-			vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
-			vkGetPhysicalDeviceMemoryProperties(device, &deviceMemoryProperties);
+			vkGetPhysicalDeviceProperties(gpu, &deviceProperties);
+			vkGetPhysicalDeviceFeatures(gpu, &deviceFeatures);
+			vkGetPhysicalDeviceMemoryProperties(gpu, &deviceMemoryProperties);
 
-			if (!isDeviceSuitable(device)) {
+			if (!isDeviceSuitable(gpu)) {
 				spdlog::debug("  {} [NOT SUITABLE]", deviceProperties.deviceName);
 				continue;
 			}
 
 			spdlog::debug("  {} {}GB [OK]", deviceProperties.deviceName, getTotalVideoRamOfDeviceInGigaBytes(deviceMemoryProperties));
 
-			ratingToGpuMapping.insert({ rateDevice(deviceProperties, deviceFeatures, deviceMemoryProperties), device });
+			ratingToGpuMapping.insert({ rateGpu(deviceProperties, deviceFeatures, deviceMemoryProperties), gpu });
 		}
 
 		// A multi-map internally sorts by key in ascending order, which makes them great for determing the best score
 		const auto bestGpu = ratingToGpuMapping.rbegin();
 
-		if (bestGpu != ratingToGpuMapping.rend() && bestGpu->first > 0) {
-			physicalDevice = bestGpu->second;
-		} else {
+		if (bestGpu == ratingToGpuMapping.rend()) {
 			spdlog::error("No suitable physical device found");
+			return false;
 		}
+
+		VkPhysicalDevice physicalDevice{ bestGpu->second };
+
+		const auto queueFamilyIndices = findQueueFamilyIndices(physicalDevice);
+
+		// Should never happen if the device's suitability check includes a check that ensures the correct queue family indices are present
+		if (!queueFamilyIndices.isComplete()) {
+			spdlog::error("A suitable physical device was found, yet the application failed to find all queue family indices");
+			return false;
+		}
+
+		constexpr const float queuePriority{ 1.0f };
+		VkDeviceQueueCreateInfo queueCreateInfo{};
+		queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+		queueCreateInfo.queueFamilyIndex = queueFamilyIndices.graphics.value();
+		queueCreateInfo.queueCount = 1;
+		queueCreateInfo.pQueuePriorities = &queuePriority;
+
+		VkPhysicalDeviceFeatures deviceFeatures{};
+
+		VkDeviceCreateInfo deviceCreateInfo{};
+		deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+		deviceCreateInfo.pQueueCreateInfos = &queueCreateInfo;
+		deviceCreateInfo.queueCreateInfoCount = 1;
+		deviceCreateInfo.pEnabledFeatures = &deviceFeatures;
+
+		// TODO: set validation layers, but this depends on the validation layer structure created previously
+		//		 first create some abstraction to handle this and then come back to this bit
+		//		 https://vulkan-tutorial.com/en/Drawing_a_triangle/Setup/Logical_device_and_queues
+
+		if (vkCreateDevice(physicalDevice, &deviceCreateInfo, nullptr, &device) != VK_SUCCESS) {
+			spdlog::error("Failed to create Vulkan logical device");
+			return false;
+		}
+
+		vkGetDeviceQueue(device, queueFamilyIndices.graphics.value(), 0, &graphicsQueue);
 	}
 
 	return true;
@@ -320,6 +353,7 @@ void Renderer::destroy() {
 	}
 #endif
 
+	vkDestroyDevice(device, nullptr);
 	vkDestroyInstance(instance, nullptr);
 	spdlog::debug("Renderer destroyed");
 }

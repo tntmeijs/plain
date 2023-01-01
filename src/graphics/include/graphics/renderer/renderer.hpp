@@ -21,7 +21,8 @@ namespace graphics::renderer {
 
 	private:
 		VkInstance instance;
-		VkPhysicalDevice physicalDevice;
+		VkDevice device;
+		VkQueue graphicsQueue;
 
 #ifndef NDEBUG
 		VkDebugUtilsMessengerEXT debugMessenger;

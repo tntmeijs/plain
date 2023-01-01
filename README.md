@@ -22,6 +22,7 @@ This project would not have been possible without the help of these awesome libr
 # Development log
 ## 1<sup>st</sup> of January 2023
 - Added queue family discovery.
+- Added logical device creation.
 
 ## 20<sup>th</sup> of December 2022
 - Added physical device (GPU) selection.
