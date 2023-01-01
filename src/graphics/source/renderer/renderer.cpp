@@ -5,6 +5,8 @@
 #include "GLFW/glfw3.h"
 
 #include <algorithm>
+#include <map>
+#include <optional>
 #include <vector>
 
 using namespace graphics::renderer;
@@ -64,7 +66,7 @@ bool Renderer::initialize() {
 		auto extensionIsMissing = false;
 		spdlog::debug("Required extensions:");
 		for (const auto& requiredExtensionName : requiredExtensions) {
-			const auto isMatchingExtensionName = [&requiredExtensionName](VkExtensionProperties properties) {
+			const auto isMatchingExtensionName = [&requiredExtensionName](VkExtensionProperties properties) -> bool {
 				return std::strcmp(properties.extensionName, requiredExtensionName) == 0;
 			};
 
@@ -95,7 +97,7 @@ bool Renderer::initialize() {
 		auto validationLayerIsMissing = false;
 		spdlog::debug("Required validation layers:");
 		for (const auto& requiredValidationLayerName : requiredValidationLayers) {
-			const auto isMatchingValidationLayerName = [&requiredValidationLayerName](VkLayerProperties properties) {
+			const auto isMatchingValidationLayerName = [&requiredValidationLayerName](VkLayerProperties properties) -> bool {
 				return std::strcmp(properties.layerName, requiredValidationLayerName) == 0;
 			};
 
@@ -160,7 +162,141 @@ bool Renderer::initialize() {
 	}
 #endif
 
-	spdlog::debug("Renderer initialized");
+	// Physical device selection
+	{
+		physicalDevice = VK_NULL_HANDLE;
+
+		std::uint32_t deviceCount = 0;
+		vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr);
+
+		if (deviceCount == 0) {
+			spdlog::error("No GPU with Vulkan support was found on this system");
+		}
+
+		std::vector<VkPhysicalDevice> physicalDevices(deviceCount);
+		vkEnumeratePhysicalDevices(instance, &deviceCount, physicalDevices.data());
+
+		struct QueueFamilyIndices {
+			std::optional<std::uint32_t> graphics;
+
+			/**
+			 * @brief Utility method to help determine if all queue family indices were found
+			 * @return True if all indices have been found, false when one or multiple indices are missing
+			*/
+			const bool isComplete() const {
+				return graphics.has_value();
+			}
+		};
+
+		const auto findQueueFamilyIndices = [](const VkPhysicalDevice& device) -> QueueFamilyIndices {
+			QueueFamilyIndices indices;
+
+			std::uint32_t queueFamilyCount = 0;
+			vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
+
+			std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
+			vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
+
+			std::uint32_t index = 0;
+			for (const auto& queueFamily : queueFamilies) {
+				if ((queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) > 0) {
+					indices.graphics = index;
+				}
+
+				// All necessary indices found, no need to keep searching
+				if (indices.isComplete()) {
+					break;
+				}
+
+				++index;
+			}
+
+			return indices;
+		};
+
+		const auto isDeviceSuitable = [&findQueueFamilyIndices](const VkPhysicalDevice& device) -> bool {
+			const auto queueFamilyIndices = findQueueFamilyIndices(device);
+
+			if (!queueFamilyIndices.isComplete()) {
+				spdlog::trace("Unable to find all required queue family indices");
+				return false;
+			}
+
+			return true;
+		};
+
+		const auto getTotalVideoRamOfDeviceInGigaBytes = [](const VkPhysicalDeviceMemoryProperties& properties) -> std::uint64_t {
+			std::uint64_t total = 0;
+
+			for (std::uint32_t i = 0; i < properties.memoryHeapCount; ++i) {
+				const auto heap = properties.memoryHeaps[i];
+
+				if ((heap.flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT) == 0) {
+					total += heap.size;
+				}
+			}
+
+			// Bytes to gigabytes (rounded)
+			return total / 1'000'000'000;
+		};
+
+		const auto rateDevice = [&getTotalVideoRamOfDeviceInGigaBytes](
+			const VkPhysicalDeviceProperties& deviceProperties,
+			const VkPhysicalDeviceFeatures& deviceFeatures,
+			const VkPhysicalDeviceMemoryProperties& deviceMemoryProperties) -> std::uint64_t {
+				// Suppress "unreferenced formal parameter"
+				deviceFeatures;
+
+				std::uint64_t score = 0;
+
+				// Prefer discrete GPUs over integrated GPUs
+				if (deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) {
+					// Discrete GPUs are superior and should be preferred whenever possible
+					score += 1'000'000;
+				} else if (deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU) {
+					// Integrated GPUs are not great, but work for applications that do not require lots of compute power
+					score += 1'000;
+				} else {
+					// Any other "GPU" is probably pretty awful, but at least it supports Vulkan...
+					score += 1;
+				}
+
+				// Prefer the device with the highest amount of video memory
+				return score + getTotalVideoRamOfDeviceInGigaBytes(deviceMemoryProperties);
+		};
+
+		std::multimap<std::uint64_t, VkPhysicalDevice> ratingToGpuMapping;
+
+		spdlog::debug("Found {} GPU{}:", deviceCount, deviceCount != 1 ? "s" : "");
+		for (const auto& device : physicalDevices) {
+			VkPhysicalDeviceProperties deviceProperties;
+			VkPhysicalDeviceFeatures deviceFeatures;
+			VkPhysicalDeviceMemoryProperties deviceMemoryProperties;
+
+			vkGetPhysicalDeviceProperties(device, &deviceProperties);
+			vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
+			vkGetPhysicalDeviceMemoryProperties(device, &deviceMemoryProperties);
+
+			if (!isDeviceSuitable(device)) {
+				spdlog::debug("  {} [NOT SUITABLE]", deviceProperties.deviceName);
+				continue;
+			}
+
+			spdlog::debug("  {} {}GB [OK]", deviceProperties.deviceName, getTotalVideoRamOfDeviceInGigaBytes(deviceMemoryProperties));
+
+			ratingToGpuMapping.insert({ rateDevice(deviceProperties, deviceFeatures, deviceMemoryProperties), device });
+		}
+
+		// A multi-map internally sorts by key in ascending order, which makes them great for determing the best score
+		const auto bestGpu = ratingToGpuMapping.rbegin();
+
+		if (bestGpu != ratingToGpuMapping.rend() && bestGpu->first > 0) {
+			physicalDevice = bestGpu->second;
+		} else {
+			spdlog::error("No suitable physical device found");
+		}
+	}
+
 	return true;
 }
 

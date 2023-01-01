@@ -20,6 +20,12 @@ To avoid spending a lot of time writing literally *everything* from scratch, Pla
 This project would not have been possible without the help of these awesome libraries. ♥
 
 # Development log
+## 1<sup>st</sup> of January 2023
+- Added queue family discovery.
+
+## 20<sup>th</sup> of December 2022
+- Added physical device (GPU) selection.
+
 ## 11<sup>th</sup> of December 2022
 - Added Vulkan instance creation.
 - Added Vulkan extension and validation layer configuration.
