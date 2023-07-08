@@ -13,7 +13,7 @@ int main(int argc, char* argv[]) {
 	argc;
 	argv;
 
-	spdlog::set_level(spdlog::level::level_enum::trace);
+	spdlog::set_level(spdlog::level::level_enum::debug);
 
 	auto window = Window(800, 600, "Plain - a webbrowser by Tahar Meijs");
 	if (!window.create()) {

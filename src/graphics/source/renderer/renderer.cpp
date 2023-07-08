@@ -41,6 +41,10 @@ bool Renderer::initialize() {
 	debugMessengerCreateInfo.pUserData = nullptr;
 #endif
 
+	const std::vector<const char*> requiredValidationLayers = {
+			"VK_LAYER_KHRONOS_validation"
+	};
+
 	// Instance creation
 	{
 		std::uint32_t glfwExtensionCount = 0;
@@ -84,10 +88,6 @@ bool Renderer::initialize() {
 		}
 
 #ifndef NDEBUG
-		const std::vector<const char*> requiredValidationLayers = {
-			"VK_LAYER_KHRONOS_validation"
-		};
-
 		std::uint32_t availableValidationLayerCount = 0;
 		vkEnumerateInstanceLayerProperties(&availableValidationLayerCount, nullptr);
 
@@ -318,9 +318,12 @@ bool Renderer::initialize() {
 		deviceCreateInfo.queueCreateInfoCount = 1;
 		deviceCreateInfo.pEnabledFeatures = &deviceFeatures;
 
-		// TODO: set validation layers, but this depends on the validation layer structure created previously
-		//		 first create some abstraction to handle this and then come back to this bit
-		//		 https://vulkan-tutorial.com/en/Drawing_a_triangle/Setup/Logical_device_and_queues
+#ifndef NDEBUG
+		deviceCreateInfo.enabledLayerCount = static_cast<std::uint32_t>(requiredValidationLayers.size());
+		deviceCreateInfo.ppEnabledLayerNames = requiredValidationLayers.data();
+#else
+		deviceCreateInfo.enabledLayerCount = 0;
+#endif
 
 		if (vkCreateDevice(physicalDevice, &deviceCreateInfo, nullptr, &device) != VK_SUCCESS) {
 			spdlog::error("Failed to create Vulkan logical device");
