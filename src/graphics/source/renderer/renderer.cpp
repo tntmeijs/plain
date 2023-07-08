@@ -56,7 +56,11 @@ bool Renderer::initialize(const window::Window& window) {
 #endif
 
 	const std::vector<const char*> requiredValidationLayers = {
-			"VK_LAYER_KHRONOS_validation"
+		"VK_LAYER_KHRONOS_validation"
+	};
+
+	const std::vector<const char*> requiredDeviceExtensions = {
+		VK_KHR_SWAPCHAIN_EXTENSION_NAME
 	};
 
 	// Instance creation
@@ -82,13 +86,13 @@ bool Renderer::initialize(const window::Window& window) {
 		vkEnumerateInstanceExtensionProperties(nullptr, &availableExtensionCount, availableExtensions.data());
 
 		auto extensionIsMissing = false;
-		spdlog::debug("Required extensions:");
+		spdlog::debug("Required instance extensions:");
 		for (const auto& requiredExtensionName : requiredExtensions) {
 			const auto isMatchingExtensionName = [&requiredExtensionName](VkExtensionProperties properties) -> bool {
 				return std::strcmp(properties.extensionName, requiredExtensionName) == 0;
 			};
 
-			const auto found = std::find_if(std::begin(availableExtensions), std::end(availableExtensions), isMatchingExtensionName) != std::end(availableExtensions);
+			const auto found = std::find_if(availableExtensions.begin(), availableExtensions.end(), isMatchingExtensionName) != availableExtensions.end();
 			spdlog::debug("  [{}] {}", found ? "OK" : "MISSING", requiredExtensionName);
 
 			if (!found) {
@@ -115,7 +119,7 @@ bool Renderer::initialize(const window::Window& window) {
 				return std::strcmp(properties.layerName, requiredValidationLayerName) == 0;
 			};
 
-			const auto found = std::find_if(std::begin(availableValidationLayers), std::end(availableValidationLayers), isMatchingValidationLayerName) != std::end(availableValidationLayers);
+			const auto found = std::find_if(availableValidationLayers.begin(), availableValidationLayers.end(), isMatchingValidationLayerName) != availableValidationLayers.end();
 			spdlog::debug("  [{}] {}", found ? "OK" : "MISSING", requiredValidationLayerName);
 
 			if (!found) {
@@ -250,7 +254,34 @@ bool Renderer::initialize(const window::Window& window) {
 			return indices;
 		};
 
-		const auto isDeviceSuitable = [&findQueueFamilyIndices](const VkPhysicalDevice& gpu, const VkSurfaceKHR& surface) -> bool {
+		const auto isDeviceSuitable = [&findQueueFamilyIndices, &requiredDeviceExtensions](const VkPhysicalDevice& gpu, const VkSurfaceKHR& surface) -> bool {
+			std::uint32_t deviceExtensionCount = 0;
+			vkEnumerateDeviceExtensionProperties(gpu, nullptr, &deviceExtensionCount, nullptr);
+
+			std::vector<VkExtensionProperties> deviceExtensions(deviceExtensionCount);
+			vkEnumerateDeviceExtensionProperties(gpu, nullptr, &deviceExtensionCount, deviceExtensions.data());
+
+			std::uint32_t foundRequiredExtensionCount = 0;
+			spdlog::debug("    Required device extensions:");
+			for (const auto& requiredExtensionName : requiredDeviceExtensions) {
+				const auto isMatchingExtensionName = [&requiredExtensionName](const VkExtensionProperties& properties) {
+					return std::strcmp(properties.extensionName, requiredExtensionName) == 0;
+				};
+
+				bool found = false;
+				if (std::find_if(deviceExtensions.begin(), deviceExtensions.end(), isMatchingExtensionName) != deviceExtensions.end()) {
+					++foundRequiredExtensionCount;
+					found = true;
+				}
+
+				spdlog::debug("      [{}] {}", found ? "OK" : "MISSING", requiredExtensionName);
+			}
+
+			if (foundRequiredExtensionCount != requiredDeviceExtensions.size()) {
+				spdlog::trace("Unable to find all required device extensions");
+				return false;
+			}
+
 			const auto queueFamilyIndices = findQueueFamilyIndices(gpu, surface);
 
 			if (!queueFamilyIndices.isComplete()) {
@@ -313,12 +344,14 @@ bool Renderer::initialize(const window::Window& window) {
 			vkGetPhysicalDeviceFeatures(gpu, &deviceFeatures);
 			vkGetPhysicalDeviceMemoryProperties(gpu, &deviceMemoryProperties);
 
+			spdlog::debug("  {} {}GB", deviceProperties.deviceName, getTotalVideoRamOfDeviceInGigaBytes(deviceMemoryProperties));
+
 			if (!isDeviceSuitable(gpu, surface)) {
-				spdlog::debug("  {} [NOT SUITABLE]", deviceProperties.deviceName);
+				spdlog::debug("    Device is unsuitable for use");
 				continue;
 			}
 
-			spdlog::debug("  {} {}GB [OK]", deviceProperties.deviceName, getTotalVideoRamOfDeviceInGigaBytes(deviceMemoryProperties));
+			spdlog::debug("    Device is suitable for use");
 
 			ratingToGpuMapping.insert({ rateGpu(deviceProperties, deviceFeatures, deviceMemoryProperties), gpu });
 		}
@@ -364,6 +397,8 @@ bool Renderer::initialize(const window::Window& window) {
 		deviceCreateInfo.pQueueCreateInfos = queueCreateInfos.data();
 		deviceCreateInfo.queueCreateInfoCount = static_cast<std::uint32_t>(queueCreateInfos.size());
 		deviceCreateInfo.pEnabledFeatures = &deviceFeatures;
+		deviceCreateInfo.enabledExtensionCount = static_cast<std::uint32_t>(requiredDeviceExtensions.size());
+		deviceCreateInfo.ppEnabledExtensionNames = requiredDeviceExtensions.data();
 
 #ifndef NDEBUG
 		deviceCreateInfo.enabledLayerCount = static_cast<std::uint32_t>(requiredValidationLayers.size());
