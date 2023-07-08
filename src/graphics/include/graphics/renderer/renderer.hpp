@@ -1,33 +1,54 @@
 #ifndef GRAPHICS_RENDERER_RENDERER_HPP
 #define GRAPHICS_RENDERER_RENDERER_HPP
 
+#include "graphics/window/window.hpp"
+
 #include "vulkan/vulkan.h"
 
-namespace graphics::renderer {
+namespace graphics {
 
-	class Renderer final {
-	public:
-		// Initialize the renderer's systems
-		bool initialize();
+	namespace window {
+		class Window;
+	}
 
-		// Prepare for drawing
-		bool update();
+	namespace renderer {
 
-		// Draw the scene
-		void render() const;
+		class Renderer final {
+		public:
+			Renderer();
+			Renderer(const Renderer&) = delete;
+			Renderer(Renderer&&) = delete;
+			Renderer& operator=(const Renderer&) = delete;
+			Renderer& operator=(const Renderer&&) = delete;
+			~Renderer() = default;
 
-		// Deallocate resources
-		void destroy();
+			// Initialize the renderer's systems
+			bool initialize(const window::Window& window);
 
-	private:
-		VkInstance instance;
-		VkDevice device;
-		VkQueue graphicsQueue;
+			// Prepare for drawing
+			bool update();
+
+			// Draw the scene
+			void render() const;
+
+			// Deallocate resources
+			void destroy();
+
+		private:
+			VkInstance instance;
+			VkDevice device;
+			VkQueue graphicsQueue;
+			VkQueue presentQueue;
+			VkSurfaceKHR surface;
 
 #ifndef NDEBUG
-		VkDebugUtilsMessengerEXT debugMessenger;
+			VkDebugUtilsMessengerEXT debugMessenger;
 #endif
-	};
+
+			bool isDestroyed;
+		};
+
+	}
 
 }
 

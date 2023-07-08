@@ -13,7 +13,7 @@ Window::Window(const std::uint32_t width, const std::uint32_t height, const std:
 	if (glfwInit() != GLFW_TRUE) {
 		spdlog::critical("Unable to initialize GLFW: {}", glfwGetError(nullptr));
 	} else {
-		spdlog::debug("GLFW initialized");
+		spdlog::debug("GLFW initialised");
 	}
 }
 
@@ -47,4 +47,8 @@ void Window::destroy() {
 		glfwDestroyWindow(handle);
 		handle = nullptr;
 	}
+}
+
+GLFWwindow* const Window::getRawHandle() const {
+	return handle;
 }

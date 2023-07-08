@@ -22,7 +22,7 @@ int main(int argc, char* argv[]) {
 	}
 
 	auto renderer = Renderer();
-	renderer.initialize();
+	renderer.initialize(window);
 
 	do {
 		window.poll();

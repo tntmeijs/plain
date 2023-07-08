@@ -1,4 +1,5 @@
 #include "graphics/renderer/renderer.hpp"
+#include "graphics/window/window.hpp"
 
 #include "spdlog/spdlog.h"
 
@@ -8,8 +9,10 @@
 #include <map>
 #include <optional>
 #include <vector>
+#include <set>
 
 using namespace graphics::renderer;
+using namespace graphics::window;
 
 static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
 	VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
@@ -31,7 +34,18 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
 	return VK_FALSE;
 }
 
-bool Renderer::initialize() {
+Renderer::Renderer() :
+	instance(VK_NULL_HANDLE),
+	device(VK_NULL_HANDLE),
+	graphicsQueue(VK_NULL_HANDLE),
+	presentQueue(VK_NULL_HANDLE),
+	surface(VK_NULL_HANDLE),
+#ifndef NDEBUG
+	debugMessenger(VK_NULL_HANDLE),
+#endif
+	isDestroyed(false) {}
+
+bool Renderer::initialize(const window::Window& window) {
 #ifndef NDEBUG
 	VkDebugUtilsMessengerCreateInfoEXT debugMessengerCreateInfo{};
 	debugMessengerCreateInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
@@ -145,6 +159,14 @@ bool Renderer::initialize() {
 		}
 	}
 
+	// Surface creation
+	{
+		if (glfwCreateWindowSurface(instance, window.getRawHandle(), nullptr, &surface) != VK_SUCCESS) {
+			spdlog::error("Failed to create Vulkan surface");
+			return false;
+		}
+	}
+
 #ifndef NDEBUG
 	// Debug messenger function set-up
 	{
@@ -176,17 +198,26 @@ bool Renderer::initialize() {
 
 		struct QueueFamilyIndices {
 			std::optional<std::uint32_t> graphics;
+			std::optional<std::uint32_t> present;
 
 			/**
 			 * @brief Utility method to help determine if all queue family indices were found
 			 * @return True if all indices have been found, false when one or multiple indices are missing
 			*/
 			const bool isComplete() const {
-				return graphics.has_value();
+				return graphics.has_value() && present.has_value();
+			}
+
+			/*
+			* @brief Utility method to help construct a collection of all unique queue indices
+			* @return Vector containing the unique queue indices
+			*/
+			const std::set<std::uint32_t> getUniqueIndices() const {
+				return { graphics.value(), present.value() };
 			}
 		};
 
-		const auto findQueueFamilyIndices = [](const VkPhysicalDevice& device) -> QueueFamilyIndices {
+		const auto findQueueFamilyIndices = [](const VkPhysicalDevice& device, const VkSurfaceKHR& surface) -> QueueFamilyIndices {
 			QueueFamilyIndices indices;
 
 			std::uint32_t queueFamilyCount = 0;
@@ -201,6 +232,13 @@ bool Renderer::initialize() {
 					indices.graphics = index;
 				}
 
+				VkBool32 hasPresentSupport = VK_FALSE;
+				vkGetPhysicalDeviceSurfaceSupportKHR(device, index, surface, &hasPresentSupport);
+
+				if (hasPresentSupport == VK_TRUE) {
+					indices.present = index;
+				}
+
 				// All necessary indices found, no need to keep searching
 				if (indices.isComplete()) {
 					break;
@@ -212,8 +250,8 @@ bool Renderer::initialize() {
 			return indices;
 		};
 
-		const auto isDeviceSuitable = [&findQueueFamilyIndices](const VkPhysicalDevice& gpu) -> bool {
-			const auto queueFamilyIndices = findQueueFamilyIndices(gpu);
+		const auto isDeviceSuitable = [&findQueueFamilyIndices](const VkPhysicalDevice& gpu, const VkSurfaceKHR& surface) -> bool {
+			const auto queueFamilyIndices = findQueueFamilyIndices(gpu, surface);
 
 			if (!queueFamilyIndices.isComplete()) {
 				spdlog::trace("Unable to find all required queue family indices");
@@ -275,7 +313,7 @@ bool Renderer::initialize() {
 			vkGetPhysicalDeviceFeatures(gpu, &deviceFeatures);
 			vkGetPhysicalDeviceMemoryProperties(gpu, &deviceMemoryProperties);
 
-			if (!isDeviceSuitable(gpu)) {
+			if (!isDeviceSuitable(gpu, surface)) {
 				spdlog::debug("  {} [NOT SUITABLE]", deviceProperties.deviceName);
 				continue;
 			}
@@ -295,7 +333,7 @@ bool Renderer::initialize() {
 
 		VkPhysicalDevice physicalDevice{ bestGpu->second };
 
-		const auto queueFamilyIndices = findQueueFamilyIndices(physicalDevice);
+		const auto queueFamilyIndices = findQueueFamilyIndices(physicalDevice, surface);
 
 		// Should never happen if the device's suitability check includes a check that ensures the correct queue family indices are present
 		if (!queueFamilyIndices.isComplete()) {
@@ -303,19 +341,28 @@ bool Renderer::initialize() {
 			return false;
 		}
 
-		constexpr const float queuePriority{ 1.0f };
-		VkDeviceQueueCreateInfo queueCreateInfo{};
-		queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-		queueCreateInfo.queueFamilyIndex = queueFamilyIndices.graphics.value();
-		queueCreateInfo.queueCount = 1;
-		queueCreateInfo.pQueuePriorities = &queuePriority;
+		constexpr float queuePriority{ 1.0f };
+		const auto queuesToCreate = queueFamilyIndices.getUniqueIndices();
+
+		std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
+		queueCreateInfos.reserve(queuesToCreate.size());
+
+		for (const auto queueToCreate : queuesToCreate) {
+			VkDeviceQueueCreateInfo queueCreateInfo{};
+			queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+			queueCreateInfo.queueFamilyIndex = queueToCreate;
+			queueCreateInfo.queueCount = 1;
+			queueCreateInfo.pQueuePriorities = &queuePriority;
+
+			queueCreateInfos.push_back(queueCreateInfo);
+		}
 
 		VkPhysicalDeviceFeatures deviceFeatures{};
 
 		VkDeviceCreateInfo deviceCreateInfo{};
 		deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-		deviceCreateInfo.pQueueCreateInfos = &queueCreateInfo;
-		deviceCreateInfo.queueCreateInfoCount = 1;
+		deviceCreateInfo.pQueueCreateInfos = queueCreateInfos.data();
+		deviceCreateInfo.queueCreateInfoCount = static_cast<std::uint32_t>(queueCreateInfos.size());
 		deviceCreateInfo.pEnabledFeatures = &deviceFeatures;
 
 #ifndef NDEBUG
@@ -331,8 +378,10 @@ bool Renderer::initialize() {
 		}
 
 		vkGetDeviceQueue(device, queueFamilyIndices.graphics.value(), 0, &graphicsQueue);
+		vkGetDeviceQueue(device, queueFamilyIndices.present.value(), 0, &presentQueue);
 	}
 
+	spdlog::debug("Renderer initialised");
 	return true;
 }
 
@@ -343,6 +392,14 @@ bool Renderer::update() {
 void Renderer::render() const {}
 
 void Renderer::destroy() {
+	if (isDestroyed) {
+		spdlog::debug("Renderer already destroyed, this invocation will be ignored");
+		return;
+	}
+
+	spdlog::debug("Destroying renderer");
+	isDestroyed = true;
+
 #ifndef NDEBUG
 	// Debug messenger
 	{
@@ -357,6 +414,7 @@ void Renderer::destroy() {
 #endif
 
 	vkDestroyDevice(device, nullptr);
+	vkDestroySurfaceKHR(instance, surface, nullptr);
 	vkDestroyInstance(instance, nullptr);
 	spdlog::debug("Renderer destroyed");
 }

@@ -30,6 +30,9 @@ namespace graphics::window {
 		// Destroy the window
 		void destroy();
 
+		// Get the raw window handle
+		GLFWwindow* const getRawHandle() const;
+
 	private:
 		std::uint32_t width;
 		std::uint32_t height;
