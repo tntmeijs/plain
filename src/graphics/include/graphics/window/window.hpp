@@ -33,6 +33,12 @@ namespace graphics::window {
 		// Get the raw window handle
 		GLFWwindow* const getRawHandle() const;
 
+		// Get the width of the screen in pixels
+		std::uint32_t getWidth() const;
+
+		// Get the height of the screen in pixels
+		std::uint32_t getHeight() const;
+
 	private:
 		std::uint32_t width;
 		std::uint32_t height;

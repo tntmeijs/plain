@@ -52,3 +52,17 @@ void Window::destroy() {
 GLFWwindow* const Window::getRawHandle() const {
 	return handle;
 }
+
+std::uint32_t Window::getWidth() const {
+	int widthValue = 0;
+	glfwGetFramebufferSize(handle, &widthValue, nullptr);
+
+	return static_cast<std::uint32_t>(widthValue);
+}
+
+std::uint32_t Window::getHeight() const {
+	int heightValue = 0;
+	glfwGetFramebufferSize(handle, nullptr, &heightValue);
+
+	return static_cast<std::uint32_t>(heightValue);
+}

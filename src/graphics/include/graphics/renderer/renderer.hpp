@@ -1,9 +1,9 @@
 #ifndef GRAPHICS_RENDERER_RENDERER_HPP
 #define GRAPHICS_RENDERER_RENDERER_HPP
 
-#include "graphics/window/window.hpp"
-
 #include "vulkan/vulkan.h"
+
+#include <vector>
 
 namespace graphics {
 
@@ -40,10 +40,16 @@ namespace graphics {
 			VkQueue graphicsQueue;
 			VkQueue presentQueue;
 			VkSurfaceKHR surface;
+			VkSwapchainKHR swapchain;
 
 #ifndef NDEBUG
 			VkDebugUtilsMessengerEXT debugMessenger;
 #endif
+
+			VkFormat swapchainImageFormat;
+			VkExtent2D swapchainExtent;
+			std::vector<VkImage> swapchainImages;
+			std::vector<VkImageView> swapchainImageViews;
 
 			bool isDestroyed;
 		};
