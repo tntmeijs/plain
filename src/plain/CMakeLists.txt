@@ -24,3 +24,8 @@ if(MSVC)
 else()
     target_compile_options(plain PRIVATE -Wall -Wextra -Wpedantic -Werror)
 endif()
+
+add_dependencies(plain network graphics spdlog)
+
+# Move any resources to the folder of the exectuable to ensure that files can still be read from their relative location
+file(COPY "${CMAKE_SOURCE_DIR}/src/resources" DESTINATION "${CMAKE_BINARY_DIR}/plain")

@@ -1,4 +1,5 @@
 #include "graphics/renderer/renderer.hpp"
+#include "graphics/renderer/shader_module.hpp"
 #include "graphics/window/window.hpp"
 
 #include "spdlog/spdlog.h"
@@ -44,9 +45,9 @@ Renderer::Renderer() :
 	debugMessenger(VK_NULL_HANDLE),
 #endif
 	swapchainImageFormat(VK_FORMAT_UNDEFINED),
-	swapchainExtent({0, 0}),
-	swapchainImages({}),
-	swapchainImageViews({}),
+	swapchainExtent{ 0, 0 },
+	swapchainImages{},
+	swapchainImageViews{},
 	isDestroyed(false) {}
 
 bool Renderer::initialize(const window::Window& window) {
@@ -552,7 +553,7 @@ bool Renderer::initialize(const window::Window& window) {
 			createInfo.image = swapchainImages[i];
 			createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
 			createInfo.format = swapchainImageFormat;
-			
+
 			createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 			createInfo.subresourceRange.baseMipLevel = 0;
 			createInfo.subresourceRange.levelCount = 1;
@@ -571,6 +572,35 @@ bool Renderer::initialize(const window::Window& window) {
 				return false;
 			}
 		}
+	}
+
+	{
+		// Load shader source code and compile into SPIR-V
+		auto vertexShaderModule = ShaderModule{ device };
+
+		if (!vertexShaderModule.compileFromFile("./resources/shaders/triangle.vs") || !vertexShaderModule.create()) {
+			return false;
+		}
+
+		VkPipelineShaderStageCreateInfo vertexShaderStageInfo{};
+		vertexShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+		vertexShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
+		vertexShaderStageInfo.module = vertexShaderModule.handle();
+		vertexShaderStageInfo.pName = "main";
+
+		auto fragmentShaderModule = ShaderModule{ device };
+
+		if (!fragmentShaderModule.compileFromFile("./resources/shaders/triangle.fs") || !fragmentShaderModule.create()) {
+			return false;
+		}
+
+		VkPipelineShaderStageCreateInfo fragmentShaderStageInfo{};
+		fragmentShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+		fragmentShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+		fragmentShaderStageInfo.module = fragmentShaderModule.handle();
+		fragmentShaderStageInfo.pName = "main";
+
+		const VkPipelineShaderStageCreateInfo shaderStages[] = { vertexShaderStageInfo, fragmentShaderStageInfo };
 	}
 
 	spdlog::debug("Renderer initialised");

@@ -39,3 +39,5 @@ endif()
 if(WIN32)
     target_link_libraries(network PRIVATE Ws2_32.lib)
 endif()
+
+add_dependencies(network spdlog)

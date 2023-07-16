@@ -7,9 +7,6 @@ project(
     LANGUAGES CXX
 )
 
-# Configure Vulkan
-find_package(Vulkan REQUIRED)
-
 # Configure Spdlog
 include(ExternalProject)
 ExternalProject_Add(spdlog
@@ -23,27 +20,12 @@ ExternalProject_Add(spdlog
     -DSPDLOG_BUILD_SHARED=OFF
 )
 
-# Configure GLFW
-set(GLFW_BUILD_DOCS false)
-set(GLFW_INSTALL false)
-set(GLFW_BUILD_EXAMPLES false)
-set(GLFW_BUILD_TESTS false)
-add_subdirectory("${PROJECT_SOURCE_DIR}/dependencies/glfw")
-
-# Configure GLM
-add_subdirectory("${PROJECT_SOURCE_DIR}/dependencies/glm")
-
 # Plain projects
-add_subdirectory("src/graphics")
-add_subdirectory("src/network")
-add_subdirectory("src/core")
+add_subdirectory("src/graphics" "graphics")
+add_subdirectory("src/network" "network")
+add_subdirectory("src/plain" "plain")
 
-# Ensure the projects build in the correct order
-add_dependencies(network spdlog)
-add_dependencies(graphics spdlog glm glfw)
-add_dependencies(plain network graphics spdlog)
-
-# When using Visual Studio, set the core executable as the startup project
+# When using Visual Studio, set the startup project to make it easier to run the application
 if (${MSVC})
     set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT plain)
 endif()
