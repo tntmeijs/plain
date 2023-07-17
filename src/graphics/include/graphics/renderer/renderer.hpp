@@ -41,6 +41,9 @@ namespace graphics {
 			VkQueue presentQueue;
 			VkSurfaceKHR surface;
 			VkSwapchainKHR swapchain;
+			VkRenderPass renderPass;
+			VkPipelineLayout pipelineLayout;
+			VkPipeline graphicsPipeline;
 
 #ifndef NDEBUG
 			VkDebugUtilsMessengerEXT debugMessenger;
