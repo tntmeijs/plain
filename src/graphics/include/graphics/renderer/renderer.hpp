@@ -53,6 +53,7 @@ namespace graphics {
 			VkExtent2D swapchainExtent;
 			std::vector<VkImage> swapchainImages;
 			std::vector<VkImageView> swapchainImageViews;
+			std::vector<VkFramebuffer> swapchainFrameBuffers;
 
 			bool isDestroyed;
 		};

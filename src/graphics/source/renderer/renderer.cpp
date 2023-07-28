@@ -51,6 +51,7 @@ Renderer::Renderer() :
 	swapchainExtent{ 0, 0 },
 	swapchainImages{},
 	swapchainImageViews{},
+	swapchainFrameBuffers{},
 	isDestroyed(false) {}
 
 bool Renderer::initialize(const window::Window& window) {
@@ -735,6 +736,29 @@ bool Renderer::initialize(const window::Window& window) {
 		}
 	}
 
+	// Framebuffers
+	{
+		swapchainFrameBuffers.resize(swapchainImageViews.size());
+
+		for (auto i = 0; i < swapchainImageViews.size(); ++i) {
+			VkImageView attachments[] = { swapchainImageViews[i]};
+
+			VkFramebufferCreateInfo framebufferCreateInfo{};
+			framebufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+			framebufferCreateInfo.renderPass = renderPass;
+			framebufferCreateInfo.attachmentCount = 1;
+			framebufferCreateInfo.pAttachments = attachments;
+			framebufferCreateInfo.width = swapchainExtent.width;
+			framebufferCreateInfo.height = swapchainExtent.height;
+			framebufferCreateInfo.layers = 1;
+
+			if (vkCreateFramebuffer(device, &framebufferCreateInfo, nullptr, &swapchainFrameBuffers[i]) != VK_SUCCESS) {
+				spdlog::error("Failed to create framebuffer for index {}", i);
+				return false;
+			}
+		}
+	}
+
 	spdlog::debug("Renderer initialised");
 	return true;
 }
@@ -767,6 +791,12 @@ void Renderer::destroy() {
 	}
 #endif
 
+	for (const auto& framebuffer : swapchainFrameBuffers) {
+		vkDestroyFramebuffer(device, framebuffer, nullptr);
+	}
+
+	swapchainFrameBuffers.clear();
+
 	vkDestroyPipeline(device, graphicsPipeline, nullptr);
 	vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
 	vkDestroyRenderPass(device, renderPass, nullptr);
@@ -774,6 +804,8 @@ void Renderer::destroy() {
 	for (const auto& swapchainImageView : swapchainImageViews) {
 		vkDestroyImageView(device, swapchainImageView, nullptr);
 	}
+
+	swapchainImageViews.clear();
 
 	vkDestroySwapchainKHR(device, swapchain, nullptr);
 	vkDestroyDevice(device, nullptr);
