@@ -26,7 +26,6 @@ int main(int argc, char* argv[]) {
 
 	do {
 		window.poll();
-		renderer.update();
 		renderer.render();
 	} while (window.isAlive());
 	

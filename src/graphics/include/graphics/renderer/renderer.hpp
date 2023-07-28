@@ -3,6 +3,7 @@
 
 #include "vulkan/vulkan.h"
 
+#include <cstdint>
 #include <vector>
 
 namespace graphics {
@@ -25,9 +26,6 @@ namespace graphics {
 			// Initialize the renderer's systems
 			bool initialize(const window::Window& window);
 
-			// Prepare for drawing
-			bool update();
-
 			// Draw the scene
 			void render() const;
 
@@ -44,6 +42,8 @@ namespace graphics {
 			VkRenderPass renderPass;
 			VkPipelineLayout pipelineLayout;
 			VkPipeline graphicsPipeline;
+			VkCommandPool commandPool;
+			VkCommandBuffer commandBuffer;
 
 #ifndef NDEBUG
 			VkDebugUtilsMessengerEXT debugMessenger;
@@ -54,6 +54,7 @@ namespace graphics {
 			std::vector<VkImage> swapchainImages;
 			std::vector<VkImageView> swapchainImageViews;
 			std::vector<VkFramebuffer> swapchainFrameBuffers;
+			std::uint32_t swapchainImageIndex;
 
 			bool isDestroyed;
 		};
