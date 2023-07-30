@@ -7,6 +7,8 @@
 #include "GLFW/glfw3.h"
 
 #include <algorithm>
+#include <cstdint>
+#include <limits>
 #include <map>
 #include <optional>
 #include <set>
@@ -35,26 +37,28 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
 }
 
 Renderer::Renderer() :
-	instance{ VK_NULL_HANDLE },
-	device{ VK_NULL_HANDLE },
-	graphicsQueue{ VK_NULL_HANDLE },
-	presentQueue{ VK_NULL_HANDLE },
-	surface{ VK_NULL_HANDLE },
-	swapchain{ VK_NULL_HANDLE },
-	renderPass{ VK_NULL_HANDLE },
-	pipelineLayout{ VK_NULL_HANDLE },
-	graphicsPipeline{ VK_NULL_HANDLE },
-	commandPool{ VK_NULL_HANDLE },
-	commandBuffer{ VK_NULL_HANDLE },
+	instance{},
+	device{},
+	graphicsQueue{},
+	presentQueue{},
+	surface{},
+	swapchain{},
+	renderPass{},
+	pipelineLayout{},
+	graphicsPipeline{},
+	commandPool{},
+	commandBuffer{},
 #ifndef NDEBUG
-	debugMessenger{ VK_NULL_HANDLE },
+	debugMessenger{},
 #endif
 	swapchainImageFormat{ VK_FORMAT_UNDEFINED },
 	swapchainExtent{ 0, 0 },
 	swapchainImages{},
 	swapchainImageViews{},
 	swapchainFrameBuffers{},
-	swapchainImageIndex{ 0 },
+	imageAvailableSemaphore{},
+	renderFinishedSemaphore{},
+	inFlightFence{},
 	isDestroyed{ false } {}
 
 bool Renderer::initialize(const window::Window& window) {
@@ -585,12 +589,24 @@ bool Renderer::initialize(const window::Window& window) {
 	subpass.colorAttachmentCount = 1;
 	subpass.pColorAttachments = &colorAttachmentRef;
 
+	// Protect against trying to perform a subpass before an image is available
+	// This ensures that the implicit subpass before the explclit subpass is handled correctly
+	VkSubpassDependency dependency{};
+	dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+	dependency.dstSubpass = 0;
+	dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	dependency.srcAccessMask = 0;
+	dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
 	VkRenderPassCreateInfo renderPassCreateInfo{};
 	renderPassCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
 	renderPassCreateInfo.attachmentCount = 1;
 	renderPassCreateInfo.pAttachments = &colorAttachment;
 	renderPassCreateInfo.subpassCount = 1;
 	renderPassCreateInfo.pSubpasses = &subpass;
+	renderPassCreateInfo.dependencyCount = 1;
+	renderPassCreateInfo.pDependencies = &dependency;
 
 	if (vkCreateRenderPass(device, &renderPassCreateInfo, nullptr, &renderPass) != VK_SUCCESS) {
 		spdlog::error("Failed to create render pass");
@@ -744,18 +760,38 @@ bool Renderer::initialize(const window::Window& window) {
 		return false;
 	}
 
+	VkSemaphoreCreateInfo semaphoreInfo{};
+	semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+	if (vkCreateSemaphore(device, &semaphoreInfo, nullptr, &imageAvailableSemaphore) != VK_SUCCESS || vkCreateSemaphore(device, &semaphoreInfo, nullptr, &renderFinishedSemaphore) != VK_SUCCESS) {
+		spdlog::error("Failed to create semaphores");
+		return false;
+	}
+
+	VkFenceCreateInfo fenceInfo{};
+	fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+	fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;	// Signaled upon creation so the first frame never waits for the fence that it should signal after the first frame renders
+
+	if (vkCreateFence(device, &fenceInfo, nullptr, &inFlightFence) != VK_SUCCESS) {
+		spdlog::error("Failed to create fence");
+		return false;
+	}
+
 	spdlog::debug("Renderer initialised");
 	return true;
 }
 
 void Renderer::render() const {
+	// Wait for previous frame to finish
+	vkWaitForFences(device, 1, &inFlightFence, VK_TRUE, std::numeric_limits<std::uint64_t>::max());
+	vkResetFences(device, 1, &inFlightFence);
+
+	// Acquire an image from the swapchain
+	std::uint32_t swapchainImageIndex;
+	vkAcquireNextImageKHR(device, swapchain, std::numeric_limits<std::uint64_t>::max(), imageAvailableSemaphore, VK_NULL_HANDLE, &swapchainImageIndex);
+
 	VkCommandBufferBeginInfo beginInfo{};
 	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-
-	if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
-		spdlog::error("Failed to begin recording into the command buffer");
-		return;
-	}
 
 	VkClearValue clearColor{ 0.3921568f, 0.5843137f, 0.9294117f, 1.0f };
 
@@ -780,6 +816,12 @@ void Renderer::render() const {
 	scissor.offset = { 0, 0 };
 	scissor.extent = swapchainExtent;
 
+	// Start recording rendering commands
+	if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
+		spdlog::error("Failed to begin recording into the command buffer");
+		return;
+	}
+
 	vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
 	vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
@@ -791,6 +833,38 @@ void Renderer::render() const {
 		spdlog::error("Failed to end recording into the command buffer");
 		return;
 	}
+
+	// Submit the commands to the GPU
+	VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+
+	VkSubmitInfo submitInfo{};
+	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	submitInfo.waitSemaphoreCount = 1;
+	submitInfo.pWaitSemaphores = &imageAvailableSemaphore;
+	submitInfo.pWaitDstStageMask = waitStages;
+	submitInfo.commandBufferCount = 1;
+	submitInfo.pCommandBuffers = &commandBuffer;
+	submitInfo.signalSemaphoreCount = 1;
+	submitInfo.pSignalSemaphores = &renderFinishedSemaphore;
+
+	// Signals the fence so the CPU will block at the start of this method until the GPU has finished execution
+	if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, inFlightFence) != VK_SUCCESS) {
+		spdlog::error("Failed to submit queue");
+		return;
+	}
+
+	// Present the image to the screen
+	VkPresentInfoKHR presentInfo{};
+	presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+	presentInfo.waitSemaphoreCount = 1;
+	presentInfo.pWaitSemaphores = &renderFinishedSemaphore;
+	presentInfo.swapchainCount = 1;
+	presentInfo.pSwapchains = &swapchain;
+	presentInfo.pImageIndices = &swapchainImageIndex;
+
+	if (vkQueuePresentKHR(presentQueue, &presentInfo) != VK_SUCCESS) {
+		spdlog::error("Failed to present");
+	}
 }
 
 void Renderer::destroy() {
@@ -801,6 +875,8 @@ void Renderer::destroy() {
 
 	spdlog::debug("Destroying renderer");
 	isDestroyed = true;
+
+	vkDeviceWaitIdle(device);
 
 #ifndef NDEBUG
 	// Debug messenger
@@ -814,6 +890,11 @@ void Renderer::destroy() {
 		}
 	}
 #endif
+
+	vkDestroyFence(device, inFlightFence, nullptr);
+
+	vkDestroySemaphore(device, imageAvailableSemaphore, nullptr);
+	vkDestroySemaphore(device, renderFinishedSemaphore, nullptr);
 
 	vkDestroyCommandPool(device, commandPool, nullptr);
 

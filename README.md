@@ -20,6 +20,11 @@ To avoid spending a lot of time writing literally *everything* from scratch, Pla
 This project would not have been possible without the help of these awesome libraries. ♥
 
 # Development log
+## 30<sup>th</sup> of July 2023
+- After a busy period at work, I finally found some time again to pick up this project.
+- Put together Vulkan boilerplate code to render a triangle to the screen.
+  ![hello vulkan triangle](media/20230730_hello_vulkan_triangle.png)
+
 ## 1<sup>st</sup> of January 2023
 - Added queue family discovery.
 - Added logical device creation.

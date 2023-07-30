@@ -3,7 +3,6 @@
 
 #include "vulkan/vulkan.h"
 
-#include <cstdint>
 #include <vector>
 
 namespace graphics {
@@ -54,7 +53,11 @@ namespace graphics {
 			std::vector<VkImage> swapchainImages;
 			std::vector<VkImageView> swapchainImageViews;
 			std::vector<VkFramebuffer> swapchainFrameBuffers;
-			std::uint32_t swapchainImageIndex;
+
+			VkSemaphore imageAvailableSemaphore;
+			VkSemaphore renderFinishedSemaphore;
+
+			VkFence inFlightFence;
 
 			bool isDestroyed;
 		};
