@@ -3,6 +3,9 @@
 
 #include "vulkan/vulkan.h"
 
+#include "vulkan/instance.hpp"
+
+#include <string_view>
 #include <vector>
 
 namespace graphics {
@@ -23,7 +26,7 @@ namespace graphics {
 			~Renderer() = default;
 
 			// Initialize the renderer's systems
-			bool initialize(const window::Window& window);
+			bool initialize(const std::string_view applicationName, const window::Window& window);
 
 			// Draw the scene
 			void render() const;
@@ -32,7 +35,8 @@ namespace graphics {
 			void destroy();
 
 		private:
-			VkInstance instance;
+			vulkan::Instance instance;
+
 			VkDevice device;
 			VkQueue graphicsQueue;
 			VkQueue presentQueue;

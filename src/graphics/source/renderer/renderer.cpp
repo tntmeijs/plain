@@ -16,26 +16,6 @@
 using namespace graphics::renderer;
 using namespace graphics::window;
 
-static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
-	VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-	VkDebugUtilsMessageTypeFlagsEXT messageType,
-	const VkDebugUtilsMessengerCallbackDataEXT* callbackData,
-	void* userData) {
-	// Suppress "unreferenced formal parameter" warning
-	messageType;
-	userData;
-
-	if (messageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
-		spdlog::error(callbackData->pMessage);
-	} else if (messageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
-		spdlog::warn(callbackData->pMessage);
-	} else {
-		spdlog::trace(callbackData->pMessage);
-	}
-
-	return VK_FALSE;
-}
-
 Renderer::Renderer() :
 	instance{},
 	device{},
@@ -61,149 +41,70 @@ Renderer::Renderer() :
 	inFlightFence{},
 	isDestroyed{ false } {}
 
-bool Renderer::initialize(const window::Window& window) {
-#ifndef NDEBUG
-	VkDebugUtilsMessengerCreateInfoEXT debugMessengerCreateInfo{};
-	debugMessengerCreateInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-	debugMessengerCreateInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-	debugMessengerCreateInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
-	debugMessengerCreateInfo.pfnUserCallback = debugCallback;
-	debugMessengerCreateInfo.pUserData = nullptr;
-#endif
-
-	const std::vector<const char*> requiredValidationLayers = {
-		"VK_LAYER_KHRONOS_validation"
-	};
-
-	const std::vector<const char*> requiredDeviceExtensions = {
-		VK_KHR_SWAPCHAIN_EXTENSION_NAME
-	};
-
-	std::uint32_t glfwExtensionCount = 0;
-	const char** glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
-
-	std::vector<const char*> requiredExtensions(glfwExtensionCount);
-	for (std::uint32_t i = 0; i < glfwExtensionCount; ++i) {
-		requiredExtensions[i] = glfwExtensions[i];
-	}
-
-	requiredExtensions.emplace_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
-
-#ifndef NDEBUG
-	requiredExtensions.emplace_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-#endif
-
-	std::uint32_t availableExtensionCount = 0;
-	vkEnumerateInstanceExtensionProperties(nullptr, &availableExtensionCount, nullptr);
-
-	std::vector<VkExtensionProperties> availableExtensions(availableExtensionCount);
-	vkEnumerateInstanceExtensionProperties(nullptr, &availableExtensionCount, availableExtensions.data());
-
-	auto extensionIsMissing = false;
-	spdlog::debug("Required instance extensions:");
-	for (const auto& requiredExtensionName : requiredExtensions) {
-		const auto isMatchingExtensionName = [&requiredExtensionName](VkExtensionProperties properties) -> bool {
-			return std::strcmp(properties.extensionName, requiredExtensionName) == 0;
-		};
-
-		const auto found = std::find_if(availableExtensions.begin(), availableExtensions.end(), isMatchingExtensionName) != availableExtensions.end();
-		spdlog::debug("  [{}] {}", found ? "OK" : "MISSING", requiredExtensionName);
-
-		if (!found) {
-			extensionIsMissing = true;
-		}
-	}
-
-	if (extensionIsMissing) {
-		spdlog::error("One or multiple required Vulkan extensions are missing");
-		return false;
-	}
-
-#ifndef NDEBUG
-	std::uint32_t availableValidationLayerCount = 0;
-	vkEnumerateInstanceLayerProperties(&availableValidationLayerCount, nullptr);
-
-	std::vector<VkLayerProperties> availableValidationLayers(availableValidationLayerCount);
-	vkEnumerateInstanceLayerProperties(&availableValidationLayerCount, availableValidationLayers.data());
-
-	auto validationLayerIsMissing = false;
-	spdlog::debug("Required validation layers:");
-	for (const auto& requiredValidationLayerName : requiredValidationLayers) {
-		const auto isMatchingValidationLayerName = [&requiredValidationLayerName](VkLayerProperties properties) -> bool {
-			return std::strcmp(properties.layerName, requiredValidationLayerName) == 0;
-		};
-
-		const auto found = std::find_if(availableValidationLayers.begin(), availableValidationLayers.end(), isMatchingValidationLayerName) != availableValidationLayers.end();
-		spdlog::debug("  [{}] {}", found ? "OK" : "MISSING", requiredValidationLayerName);
-
-		if (!found) {
-			validationLayerIsMissing = true;
-		}
-	}
-
-	if (validationLayerIsMissing) {
-		spdlog::error("One or multiple required Vulkan validation layers are missing");
-		return false;
-	}
-#endif
-
-	VkApplicationInfo appInfo{};
-	appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-	appInfo.pApplicationName = "Plain Webbrowser";
-	appInfo.applicationVersion = VK_MAKE_VERSION(0, 0, 1);
-	appInfo.pEngineName = "Plain";
-	appInfo.engineVersion = VK_MAKE_VERSION(0, 0, 1);
-	appInfo.apiVersion = VK_API_VERSION_1_3;
-
-	VkInstanceCreateInfo instanceCreateInfo{};
-	instanceCreateInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-	instanceCreateInfo.pApplicationInfo = &appInfo;
-	instanceCreateInfo.enabledExtensionCount = static_cast<std::uint32_t>(requiredExtensions.size());
-	instanceCreateInfo.ppEnabledExtensionNames = requiredExtensions.data();
-	instanceCreateInfo.flags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
-
+bool Renderer::initialize(const std::string_view applicationName, const window::Window& window) {
 #ifdef NDEBUG
-	instanceCreateInfo.enabledLayerCount = 0;
-	instanceCreateInfo.pNext = nullptr;
+	instance = vulkan::Instance::createNew(applicationName, false);
 #else
-	instanceCreateInfo.enabledLayerCount = static_cast<std::uint32_t>(requiredValidationLayers.size());
-	instanceCreateInfo.ppEnabledLayerNames = requiredValidationLayers.data();
-	instanceCreateInfo.pNext = &debugMessengerCreateInfo;
+	instance = vulkan::Instance::newBuilder(applicationName, true)
+		.addValidationLayer("VK_LAYER_KHRONOS_validation")
+		.addExtension(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+
+	if (!instance.getMissingValidationLayers().empty()) {
+		spdlog::debug("Unsupported validation layers:");
+
+		for (const auto& unsupportedValidationLayer : instance.getMissingValidationLayers()) {
+			spdlog::debug("  {}", unsupportedValidationLayer);
+		}
+
+		return false;
+	}
 #endif
 
-	if (vkCreateInstance(&instanceCreateInfo, nullptr, &instance) != VK_SUCCESS) {
-		spdlog::error("Failed to create Vulkan instance");
+	std::uint32_t requiredGlfwExtensionsCount;
+	const char** glfwExtensions = glfwGetRequiredInstanceExtensions(&requiredGlfwExtensionsCount);
+
+	for (std::uint32_t i = 0; i < requiredGlfwExtensionsCount; ++i) {
+		instance.addExtension(glfwExtensions[i]);
+	}
+
+	if (!instance.getMissingExtensions().empty()) {
+		spdlog::debug("Unsupported instance extensions:");
+
+		for (const auto& unsupportedExtension : instance.getMissingExtensions()) {
+			spdlog::debug("  {}", unsupportedExtension);
+		}
+
 		return false;
 	}
 
-	if (glfwCreateWindowSurface(instance, window.getRawHandle(), nullptr, &surface) != VK_SUCCESS) {
+	if (!instance.create()) {
+		return false;
+	}
+
+	if (glfwCreateWindowSurface(instance.handle(), window.getRawHandle(), nullptr, &surface) != VK_SUCCESS) {
 		spdlog::error("Failed to create Vulkan surface");
 		return false;
 	}
 
 #ifndef NDEBUG
-	const auto createDebugMessengerFunc = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT"));
-
-	if (createDebugMessengerFunc == nullptr) {
-		spdlog::error("Failed to load \"vkCreateDebugUtilsMessengerEXT\" extension function");
-		return false;
-	}
-
-	if (createDebugMessengerFunc(instance, &debugMessengerCreateInfo, nullptr, &debugMessenger) != VK_SUCCESS) {
-		spdlog::error("Unable to create debug messenger");
-		return false;
+	if (!instance.loadDebugMessenger()) {
+		spdlog::warn("Debug messenger could not be loaded, Vulkan debug information will not be shown");
 	}
 #endif
 
+	const std::vector<const char*> requiredDeviceExtensions = {
+		VK_KHR_SWAPCHAIN_EXTENSION_NAME
+	};
+
 	std::uint32_t gpuCount = 0;
-	vkEnumeratePhysicalDevices(instance, &gpuCount, nullptr);
+	vkEnumeratePhysicalDevices(instance.handle(), &gpuCount, nullptr);
 
 	if (gpuCount == 0) {
 		spdlog::error("No GPU with Vulkan support was found on this system");
 	}
 
 	std::vector<VkPhysicalDevice> gpus(gpuCount);
-	vkEnumeratePhysicalDevices(instance, &gpuCount, gpus.data());
+	vkEnumeratePhysicalDevices(instance.handle(), &gpuCount, gpus.data());
 
 	struct QueueFamilyIndices {
 		std::optional<std::uint32_t> graphics;
@@ -441,10 +342,10 @@ bool Renderer::initialize(const window::Window& window) {
 	deviceCreateInfo.ppEnabledExtensionNames = requiredDeviceExtensions.data();
 
 #ifndef NDEBUG
-	deviceCreateInfo.enabledLayerCount = static_cast<std::uint32_t>(requiredValidationLayers.size());
-	deviceCreateInfo.ppEnabledLayerNames = requiredValidationLayers.data();
-#else
-	deviceCreateInfo.enabledLayerCount = 0;
+	std::vector<const char*> validationLayers(instance.getValidationLayers().begin(), instance.getValidationLayers().end());
+
+	deviceCreateInfo.enabledLayerCount = static_cast<std::uint32_t>(instance.getValidationLayers().size());
+	deviceCreateInfo.ppEnabledLayerNames = validationLayers.data();
 #endif
 
 	if (vkCreateDevice(physicalDevice, &deviceCreateInfo, nullptr, &device) != VK_SUCCESS) {
@@ -878,19 +779,6 @@ void Renderer::destroy() {
 
 	vkDeviceWaitIdle(device);
 
-#ifndef NDEBUG
-	// Debug messenger
-	{
-		auto destroyDebugMessengerFunc = reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>(vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT"));
-
-		if (destroyDebugMessengerFunc != nullptr) {
-			destroyDebugMessengerFunc(instance, debugMessenger, nullptr);
-		} else {
-			spdlog::error("Unable to destroy debug messenger because the extension function could not be loaded");
-		}
-	}
-#endif
-
 	vkDestroyFence(device, inFlightFence, nullptr);
 
 	vkDestroySemaphore(device, imageAvailableSemaphore, nullptr);
@@ -916,7 +804,6 @@ void Renderer::destroy() {
 
 	vkDestroySwapchainKHR(device, swapchain, nullptr);
 	vkDestroyDevice(device, nullptr);
-	vkDestroySurfaceKHR(instance, surface, nullptr);
-	vkDestroyInstance(instance, nullptr);
+	vkDestroySurfaceKHR(instance.handle(), surface, nullptr);
 	spdlog::debug("Renderer destroyed");
 }

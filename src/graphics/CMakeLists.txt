@@ -16,6 +16,7 @@ set(
     source/window/window.cpp
     source/renderer/renderer.cpp
     source/renderer/shader_module.cpp
+    source/renderer/vulkan/instance.cpp
 )
 
 set(
@@ -23,6 +24,7 @@ set(
     include/graphics/window/window.hpp
     include/graphics/renderer/renderer.hpp
     include/graphics/renderer/shader_module.hpp
+    include/graphics/renderer/vulkan/instance.hpp
 )
 
 set(ALL_FILES ${SOURCE_FILES} ${HEADER_FILES})
